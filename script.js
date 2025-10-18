@@ -1,96 +1,128 @@
-// Quiz questions
-const quizData = [
-    {
-        question: "What is the capital of India?",
-        options: ["Delhi", "Mumbai", "Kolkata", "Chennai"],
-        answer: "Delhi"
-    },
-    {
-        question: "Which language runs in the browser?",
-        options: ["Python", "C++", "JavaScript", "Java"],
-        answer: "JavaScript"
-    },
-    {
-        question: "Which is not a programming language?",
-        options: ["HTML", "Python", "Java", "C++"],
-        answer: "HTML"
-    },
-    {
-        question: "What year was JavaScript created?",
-        options: ["1995", "1990", "2000", "1985"],
-        answer: "1995"
-    }
-];
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-let currentQuestion = 0;
+const restartBtn = document.getElementById('restartBtn');
+const gameOverScreen = document.getElementById('gameOver');
+const restartGameBtn = document.getElementById('restartGame');
+const scoreEl = document.getElementById('score');
+const finalScoreEl = document.getElementById('finalScore');
+
+const canvasSize = 500;
+const cellSize = 25;
+
+let snake = [{x: 250, y: 250}];
+let dx = cellSize;
+let dy = 0;
+let food = {};
 let score = 0;
+let gameInterval;
 
-const questionEl = document.getElementById("question");
-const optionsEl = document.querySelectorAll(".option-btn");
-const prevBtn = document.getElementById("prev-btn");
-const nextBtn = document.getElementById("next-btn");
-const submitBtn = document.getElementById("submit-btn");
-const restartBtn = document.getElementById("restart-btn");
-const resultContainer = document.getElementById("result-container");
-const quizContainer = document.getElementById("quiz");
-const scoreEl = document.getElementById("score");
-const totalEl = document.getElementById("total");
-
-// Load question
-function loadQuestion() {
-    const currentData = quizData[currentQuestion];
-    questionEl.textContent = currentData.question;
-    optionsEl.forEach((btn, index) => {
-        btn.textContent = currentData.options[index];
-        btn.style.backgroundColor = "#f1f1f1";
-    });
+// Generate random food position
+function generateFood() {
+    food.x = Math.floor(Math.random() * (canvasSize / cellSize)) * cellSize;
+    food.y = Math.floor(Math.random() * (canvasSize / cellSize)) * cellSize;
+    // Avoid food appearing on snake
+    for(let segment of snake){
+        if(segment.x === food.x && segment.y === food.y) generateFood();
+    }
 }
 
-// Check answer
-optionsEl.forEach(btn => {
-    btn.addEventListener("click", () => {
-        if(btn.textContent === quizData[currentQuestion].answer) {
-            btn.style.backgroundColor = "#4CAF50"; // green for correct
-        } else {
-            btn.style.backgroundColor = "#f44336"; // red for wrong
-        }
+// Draw everything
+function draw() {
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+    // Draw snake
+    snake.forEach((segment, index) => {
+        ctx.fillStyle = index === 0 ? "#00ff00" : "#0f0";
+        ctx.shadowColor = "rgba(0,255,0,0.6)";
+        ctx.shadowBlur = 10;
+        ctx.fillRect(segment.x, segment.y, cellSize, cellSize);
+        ctx.shadowBlur = 0;
     });
-});
 
-// Navigation buttons
-nextBtn.addEventListener("click", () => {
-    if(currentQuestion < quizData.length - 1) {
-        currentQuestion++;
-        loadQuestion();
+    // Draw food
+    ctx.fillStyle = "#ff0000";
+    ctx.shadowColor = "rgba(255,0,0,0.6)";
+    ctx.shadowBlur = 15;
+    ctx.fillRect(food.x, food.y, cellSize, cellSize);
+    ctx.shadowBlur = 0;
+}
+
+// Move snake
+function moveSnake() {
+    const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+    // Wall collision
+    if(head.x < 0 || head.x >= canvasSize || head.y < 0 || head.y >= canvasSize || snakeCollision(head)){
+        gameOver();
+        return;
+    }
+
+    snake.unshift(head);
+
+    // Food collision
+    if(head.x === food.x && head.y === food.y){
+        score++;
+        scoreEl.textContent = score;
+        generateFood();
+    } else {
+        snake.pop();
+    }
+}
+
+// Check snake collision with itself
+function snakeCollision(head){
+    return snake.some((segment, index) => index !== 0 && segment.x === head.x && segment.y === head.y);
+}
+
+// Change direction
+document.addEventListener('keydown', e => {
+    switch(e.key){
+        case "ArrowUp":
+            if(dy === 0){ dx = 0; dy = -cellSize; }
+            break;
+        case "ArrowDown":
+            if(dy === 0){ dx = 0; dy = cellSize; }
+            break;
+        case "ArrowLeft":
+            if(dx === 0){ dx = -cellSize; dy = 0; }
+            break;
+        case "ArrowRight":
+            if(dx === 0){ dx = cellSize; dy = 0; }
+            break;
     }
 });
 
-prevBtn.addEventListener("click", () => {
-    if(currentQuestion > 0) {
-        currentQuestion--;
-        loadQuestion();
-    }
-});
+// Game loop
+function gameLoop(){
+    moveSnake();
+    draw();
+}
 
-submitBtn.addEventListener("click", () => {
+// Start game
+function startGame(){
+    snake = [{x: 250, y: 250}];
+    dx = cellSize;
+    dy = 0;
     score = 0;
-    quizData.forEach((q, i) => {
-        const selected = Array.from(optionsEl).find(btn => btn.textContent === q.answer);
-        if(selected) score++;
-    });
-    quizContainer.classList.add("hide");
-    resultContainer.classList.remove("hide");
     scoreEl.textContent = score;
-    totalEl.textContent = quizData.length;
-});
+    generateFood();
+    gameOverScreen.classList.add('hide');
+    clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, 150);
+}
 
-restartBtn.addEventListener("click", () => {
-    currentQuestion = 0;
-    score = 0;
-    resultContainer.classList.add("hide");
-    quizContainer.classList.remove("hide");
-    loadQuestion();
-});
+// Game over
+function gameOver(){
+    clearInterval(gameInterval);
+    finalScoreEl.textContent = score;
+    gameOverScreen.classList.remove('hide');
+}
 
-// Initialize first question
-loadQuestion();
+// Restart buttons
+restartBtn.addEventListener('click', startGame);
+restartGameBtn.addEventListener('click', startGame);
+
+// Initialize
+startGame();
